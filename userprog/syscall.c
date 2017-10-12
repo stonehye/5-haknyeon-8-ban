@@ -50,3 +50,21 @@ int write(int fd, const void *buffer, unsigned size)
 	}
 	return size;
 }
+
+pid_t exec(const char *cmd_line)
+{
+	char temp[100];
+	char *name, *trash;
+	struct file *f;
+
+	strlcpy(temp, cmd_line, strlen(cmd_line) + 1);
+	name = strtok_r(temp, " ", &trash);
+
+	f = filesys_open(name);
+	if (f == NULL) // 유효한 file인지 체크
+		return -1;
+	file_close(f); 
+
+	return process_execute(cmd_line);
+}
+
