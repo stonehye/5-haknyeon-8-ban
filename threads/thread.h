@@ -100,6 +100,15 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+	// Additional element // 
+	struct thread *parent; // parent thread linked list
+	int dead; // dead flag
+	int child_dead; // child dead status
+
+	struct semaphore wait_flag; // 해당 thread가 대기상태이면 value = 1, 아니면 0
+	sturct semaphore parent_status; // 해당 thread의 parent thread가 대기상태이면 value = 0, 아니면 1
+	////////////////////////
   };
 
 /* If false (default), use round-robin scheduler.
@@ -137,5 +146,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+// struct thread *find_thread(tid_t t);
 
 #endif /* threads/thread.h */
