@@ -15,8 +15,36 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-  thread_exit ();
+	int syscall_num = *(int*)(f->esp);
+	int *f_esp = f->esp;
+
+	if (syscall_num == SYS_HALT) {
+		halt();
+	}
+	else if (syscall_num == SYS_EXIT) {
+		//f->eax
+	}
+	else if (syscall_num == SYS_EXEC) {
+		f->eax = exec((const char*)f_esp[1]);
+	}
+	else if (syscall_num == SYS_WAIT) {
+		f->eax = process_wait((pid_t)f_esp[1]);
+	}
+	else if (syscall_num == SYS_READ) {
+		f->eax = read((int)f_esp[5], (void*)f_esp[6], (unsigned)f_esp[7]);
+	}
+	else if (syscall_num == SYS_WRITE) {
+		f->eax = write((int)f_esp[5], (void*)f_esp[6], (unsigned)f_esp[7]);
+	}
+	else if (syscall_num == SYS_NUM) {
+		f->eax = sum_of_four_integers((int)f_esp[6], (int)f_esp[7], (int)f_esp[8], (int)f_esp[9]);
+	}
+	else if (syscall_num == SYS_FIBO) {
+		f->eax = fibonacci((int)f_esp[1]);
+	}
+	else {
+		exit(-1);
+	}
 }
 
 void halt(void)
@@ -53,18 +81,44 @@ int write(int fd, const void *buffer, unsigned size)
 
 pid_t exec(const char *cmd_line)
 {
-	char temp[100];
-	char *name, *trash;
-	struct file *f;
+	// exception handling(?): 현재 스레드가 유효한 스레드인지 체크
+	/*struct thread *exec_thread;
+	void *temp;
 
-	strlcpy(temp, cmd_line, strlen(cmd_line) + 1);
-	name = strtok_r(temp, " ", &trash);
+	exec_thread = thread_current();
+	temp = pagedir_get_page(exec_thread->pagedir, cmd_line);
 
-	f = filesys_open(name);
-	if (f == NULL) // 유효한 file인지 체크
-		return -1;
-	file_close(f); 
+	if (temp == NULL)
+		syscall_exit(-1);*/
 
 	return process_execute(cmd_line);
 }
 
+int wait(pid_t pid) {
+	return process_wait(pid);
+}
+
+void exit(int status)
+{
+	struct thread *current_thread = thread_current();
+
+	sema_down(&current_thread->parent_status); // 자식 thread에 저장된 부모 thread 상태 업데이트; 자식 thread의 종료
+	sema_up(&(current_thread->parent->wait_flag)); // 부모 thread 대기상태 해제 (프로세스의 부모가 대기하는 경우)
+
+	current_thread->parent->dead = true; // (프로세스의 부모가 대기하는 경우)
+	current_thread->parent->child_dead = status; // 현재 thread의 상태
+
+	printf("%s: exit(%d)\n", current_thread->name, status);
+
+	thread_exit();
+}
+
+int fibonacci(int n)
+{
+	// 현선
+}
+
+int sum_of_4_integers(int n1, int n2, int n3, int n4)
+{
+	return n1 + n2 + n3 + n4;
+}

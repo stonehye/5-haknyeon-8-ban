@@ -35,21 +35,21 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  temp = palloc_get_page(0);
-
   if (fn_copy == NULL)
 	  return TID_ERROR;
 
+  /* exception handler: 해당 파일이 없을 경우 */
   strlcpy (fn_copy, file_name, PGSIZE);
-  strlcpy(temp, file_name, PGSIZE);
-  name = strtok_r(temp, " ", &trash);
+  name = strtok_r(fn_copy, " ", &trash);
+  if (filesys_open(name) == NULL)
+	  return TID_ERROR;
+  /********************************************/
 
+  strlcpy(fn_copy, file_name, PGSIZE);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
-  if (filesys_open(name) == NULL)
-	  return TID_ERROR;
   return tid;
 }
 
@@ -96,7 +96,18 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  // 현선
+	/*struct thread *child = find_thread(child_tid); // thread.c, thread.h에 find_thread 추가필요
+	struct thread *current_thread = thread_current(); // 현재 스레드
+
+	// 자식 thread가 존재하지 않거나, 자식 thread가 이미 죽은 상태이면 wait 종료
+	if (child == NULL || child->dead == 1)
+		return -1;
+
+	sema_up(&child->parent_status);
+	sema_down(&current_thread->wait_flag);
+
+	return current_thread->child_dead;*/
 }
 
 /* Free the current process's resources. */
