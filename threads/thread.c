@@ -459,19 +459,33 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
+	char temp[16];
+	char *trash;
+
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
   ASSERT (name != NULL);
 
   memset (t, 0, sizeof *t);
   t->status = THREAD_BLOCKED;
-  strlcpy (t->name, name, sizeof t->name);
+
+  // argument로 넘어온 filename을 띄어쓰기 기준으로 parsing
+  //strlcpy (t->name, name, sizeof t->name);
+  strlcpy(temp, name, 16);
+  strlcpy(t->name, strtok_r(temp, " ", &trash), sizeof(t->name));
+  /************************************************************/
+
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 
-  // 추가해야됨
+  // thread structure 요소 초기화
+  t->dead = false;
+  t->parent = NULL;
+  sema_init(&t->wait_flag, 0); // semaphore value를 0으로 초기화
+  sema_init(&t->parent_status, 0);
+  /************************************************************/
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
