@@ -115,7 +115,23 @@ void exit(int status)
 
 int fibonacci(int n)
 {
-	// Çö¼±
+	int i;
+	int x0, x1, fibo;
+
+	if (n == 0)
+		return 0;
+	else if (n == 1)
+		return 1;
+	else {
+		x0 = 0;
+		x1 = 1;
+		for (i = 0; i < n - 1; i++) {
+			fibo = x0 + x1;
+			x0 = x1;
+			x1 = fibo;
+		}
+		return fibo;
+	}
 }
 
 int sum_of_4_integers(int n1, int n2, int n3, int n4)
