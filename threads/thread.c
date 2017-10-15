@@ -587,3 +587,18 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/*
+struct thread *thread_find(tid_t tid)
+{
+	struct thread *find;
+	struct list_elem *e;
+	//근데 all_list가 도대체 뭐야...?current thread의 child list..?
+	for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e)) {
+		find = list_entry(e, struct thread, allelem);
+		if (find->tid == tid)
+			return find;
+	}
+	return NULL;
+}
+*/
