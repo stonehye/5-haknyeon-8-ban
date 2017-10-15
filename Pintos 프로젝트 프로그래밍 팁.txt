@@ -1,0 +1,27 @@
+프로젝트를 진행하는데 있어 도움이 될까 싶어 예전에 올렸던 글을 올려드립니다.
+
+시험기간도 있고 프로젝트의 수행에 어려움을 겪는 학생들이 많은 것 같아. 몇가지 팁을 드리겠습니다.
+
+process.c 에 보시면 process_execute(const char *file_name) 이라는 함수가 있을 것입니다.
+완전히 구현된 상태의 핀토스에서는 이 함수가 user program이 끝날때까지 block된 상태로 기다리고 있어야합니다.
+이는 process_wait() 함수가 제대로 구현되어야 동작하게 되어있습니다.
+하지만 초반부터 wait를 구현하기 어려울 수 있기 때문에 argument passing을 확인하는 과정에서는 process_wait() 함수에 무한루프를 넣어
+user program이 완전히 수행되기 전에도 핀토스가 기다리게 만들어야 합니다.
+아마 학생들 중 아무런 출력도 보이지 않는 학생들은 대부분 이러한 이유 때문일 것입니다.
+이는 임시방편으로 결과값을 출력하고자 하는 것이니 process_wait()를 구현하지 않은 상태에서는 어떠한 test더 pass 할 수 없을 것입니다.
+핀토스라는 메인쓰레드가 자신의 자식 쓰레드인 user program이 끝날때까지 기다려야하고 이를 구현하기 위해서는 synchronization 기법이 필요하게 됩니다.
+
+그리고 make를 한뒤 하나의 test 케이스만 수행해보고 싶은 경우.
+build 폴더로 들어가서 아래의 명령어를 입력하시면 하나의 테스트 케이스만 수행해 볼 수 있습니다.
+
+pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none -- -q  -f run args-none
+
+한 번더 요약하면 다음과 같습니다.
+1. process.c 파일의 process_wait() 함수내에 while(1); 로 무한루프를 건다.
+2. argument passing을 구현한다.
+3. printf 혹은 hex_dump를 사용하여 argument passing이 잘 이루어지고 있는지 출력 할 수 있도록 만든다.
+4. make를 한다.
+5. build 폴더에 들어가 다음 명령어를 입력한다. pintos -v -k -T 60 --bochs  --filesys-size=2 -p tests/userprog/args-none -a args-none -- -q  -f run args-none
+( 위의 test 파일은 argument가 없는 test이니 다른 test를 이용하시는 것을 추천합니다)
+6. argument passing이 잘 이루어 지고 있는지 확인한다.
+7. Ctrl + c 를 눌러서 무한루프를 종료한다.
