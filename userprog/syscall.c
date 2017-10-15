@@ -37,7 +37,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		f->eax = write((int)f_esp[5], (void*)f_esp[6], (unsigned)f_esp[7]);
 	}
 	else if (syscall_num == SYS_NUM) {
-		f->eax = sum_of_four_integers((int)f_esp[6], (int)f_esp[7], (int)f_esp[8], (int)f_esp[9]);
+		f->eax = sum_of_4_integers((int)f_esp[6], (int)f_esp[7], (int)f_esp[8], (int)f_esp[9]);
 	}
 	else if (syscall_num == SYS_FIBO) {
 		f->eax = fibonacci((int)f_esp[1]);
