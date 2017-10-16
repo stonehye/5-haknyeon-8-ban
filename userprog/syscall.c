@@ -17,12 +17,20 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
 	int syscall_num = *(int*)(f->esp);
 	int *f_esp = f->esp;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		if (is_kernel_vaddr(f_esp[i])) {
+			exit(-1);
+			break;
+		}
+	}
 
 	if (syscall_num == SYS_HALT) {
 		halt();
 	}
 	else if (syscall_num == SYS_EXIT) {
-		//f->eax
+		f->eax = exit((int)f_esp[1]);
 	}
 	else if (syscall_num == SYS_EXEC) {
 		f->eax = exec((const char*)f_esp[1]);
@@ -81,15 +89,14 @@ int write(int fd, const void *buffer, unsigned size)
 
 pid_t exec(const char *cmd_line)
 {
-	// exception handling(?): 현재 스레드가 유효한 스레드인지 체크
-	/*struct thread *exec_thread;
-	void *temp;
+	struct thread *current_thread;
+	void *addr;
 
-	exec_thread = thread_current();
-	temp = pagedir_get_page(exec_thread->pagedir, cmd_line);
+	current_thread = thread_current();
+	addr = pagedir_get_page(current_thread->pagedir, cmd_line);
 
-	if (temp == NULL)
-		syscall_exit(-1);*/
+	if (addr == NULL)
+		exit(-1); 
 
 	return process_execute(cmd_line);
 }
