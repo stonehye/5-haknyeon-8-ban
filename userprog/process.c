@@ -31,18 +31,21 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
   char *name, *temp, *trash;
+  struct file *file = NULL;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL){
 	  return TID_ERROR;
-
+  }
   /* exception handler: 해당 파일이 없을 경우 */
   strlcpy (fn_copy, file_name, PGSIZE);
   name = strtok_r(fn_copy, " ", &trash);
-  if (filesys_open(name) == NULL)
+  if (file=filesys_open(name) == NULL){
 	  return TID_ERROR;
+  }
+  file_close(file);
   /********************************************/
 
   strlcpy(fn_copy, file_name, PGSIZE);
@@ -74,6 +77,7 @@ start_process (void *file_name_)
   if (!success) 
     thread_exit ();
 
+  //printf("nooo\n");
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -97,27 +101,28 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   // 현선
-	/*struct thread *child = find_thread(child_tid); // thread.c, thread.h에 find_thread 추가필요
+	struct thread *child = thread_find(child_tid); // thread.c, thread.h에 find_thread 추가필요
 	struct thread *current_thread = thread_current(); // 현재 스레드
-
 	// 자식 thread가 존재하지 않거나, 자식 thread가 이미 죽은 상태이면 wait 종료
-	if (child == NULL || child->dead == 1)
+	if (!child || child->dead)
 		return -1;
 
 	sema_up(&child->parent_status);
 	sema_down(&current_thread->wait_flag);
 
-	return current_thread->child_dead;*/
+	//printf("%s\n",current_thread->name);
+	return current_thread->child_dead;
 }
-
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
-  struct thread *cur = thread_cnurret ();
+  struct thread *cur = thread_current ();
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
+	sema_down(&child->parent_status);
+	sema_down(&child->parent_status);
      to the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL) 
@@ -239,7 +244,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char *saveptr;
   char *token;
   int argc = 0;
-
+ 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
@@ -259,10 +264,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 		  break;
 	  }
   }
-
-  if (argc>0)
-	  strlcpy(thread_current()->name, argv[0], PGSIZE);
-  file_name = argv[0];
+	strlcpy(thread_current()->name, argv[0], PGSIZE);
+	strlcpy(file_name, argv[0], sizeof(argv[0]));
+	file_name = argv[0];
 
   /* Open executable file. */
   file = filesys_open (file_name);
@@ -352,7 +356,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	  construct_ESP(argv, argc, esp);
   else
 	  goto done;
-
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -519,13 +522,14 @@ void construct_ESP(char **argv, int argc, void **esp)
 	char *esp_save;
 
 	for (i = argc - 1; i >= 0; i -- ) {
+		//printf("%s\n",argv[i]);
 		length = strlen(argv[i]) + 1;
 		*esp -= length;
 		strlcpy((char*)(*esp), argv[i], length);
 	}
 	esp_save = (char*)(*esp);
 	*esp -= (unsigned)(*esp) % 4;
-	*esp -= 4; // word-align
+	//*esp -= 4; // word-align
 	*esp -= 4; *(unsigned*)(*esp) = 0; // PUSH argv[argc]
 	
 	*esp -= 4 * argc;
@@ -534,7 +538,7 @@ void construct_ESP(char **argv, int argc, void **esp)
 		*esp += 4;
 		esp_save += strlen(esp_save) + 1;
 	} // PUSH argv[0]~argv[argc-1]
-	*esp -= 4 * (argc - 1);
+	*esp -= 4 * (argc);
 
 	esp_save = (char*)(*esp); // &(^^^)
 	*esp -= 4;
@@ -542,5 +546,6 @@ void construct_ESP(char **argv, int argc, void **esp)
 	*esp -= 4;
 	*(unsigned*)(*esp) = (unsigned)argc; // PUSH argc (token number)
 	*esp -= 4;
-	*(unsigned *)(*esp) = 0; // PUSH return addr
+	*(unsigned *)(*esp) = 0; 
+	//hex_dump(0,*esp,100,true);// PUSH return addr
 }

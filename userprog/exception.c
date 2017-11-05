@@ -1,9 +1,20 @@
+/*#include "userprog/exception.h"
+#include <inttypes.h>
+#include <stdio.h>
+#include "userprog/gdt.h"
+#include "threads/interrupt.h"
+#include "threads/thread.h"*/
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/palloc.h"
+#include "userprog/syscall.h"
+#include "threads/vaddr.h"
+//#include "vm/page.h"
+#include "userprog/pagedir.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;

@@ -1,11 +1,24 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <user/syscall.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "devices/input.h"
+#include "userprog/pagedir.h"
+#include "userprog/process.h"
+#include "threads/init.h"
 
 static void syscall_handler (struct intr_frame *);
-
+void halt(void);
+int read(int fd, void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
+pid_t exec(const char *file);
+int wait(pid_t pid);
+void exit(int status);
+int fibonacci(int n);
+int sum_of_4_integers(int a, int b, int c, int d);
 void
 syscall_init (void) 
 {
@@ -17,20 +30,20 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
 	int syscall_num = *(int*)(f->esp);
 	int *f_esp = f->esp;
-	int i;
 
+	int i;
 	for (i = 0; i < 4; i++) {
 		if (is_kernel_vaddr(f_esp[i])) {
 			exit(-1);
 			break;
 		}
 	}
-
 	if (syscall_num == SYS_HALT) {
 		halt();
 	}
 	else if (syscall_num == SYS_EXIT) {
-		f->eax = exit((int)f_esp[1]);
+		f->eax = *(int*)(f->esp+4);
+		exit((int)f_esp[1]);
 	}
 	else if (syscall_num == SYS_EXEC) {
 		f->eax = exec((const char*)f_esp[1]);
@@ -39,16 +52,37 @@ syscall_handler (struct intr_frame *f UNUSED)
 		f->eax = process_wait((pid_t)f_esp[1]);
 	}
 	else if (syscall_num == SYS_READ) {
-		f->eax = read((int)f_esp[5], (void*)f_esp[6], (unsigned)f_esp[7]);
+		f->eax = read((int)*(f_esp+1), (void*)f_esp[2], (unsigned)f_esp[3]);
 	}
 	else if (syscall_num == SYS_WRITE) {
-		f->eax = write((int)f_esp[5], (void*)f_esp[6], (unsigned)f_esp[7]);
+		f->eax = write((int)*(f_esp+1),(void*)*(f_esp+2), (unsigned)*(f_esp+3));
 	}
 	else if (syscall_num == SYS_NUM) {
-		f->eax = sum_of_4_integers((int)f_esp[6], (int)f_esp[7], (int)f_esp[8], (int)f_esp[9]);
+		f->eax = sum_of_4_integers((int)f_esp[1], (int)f_esp[2], (int)f_esp[3], (int)f_esp[4]);
 	}
 	else if (syscall_num == SYS_FIBO) {
 		f->eax = fibonacci((int)f_esp[1]);
+	}
+	else if (syscall_num == SYS_CREATE) {
+
+	}
+	else if (syscall_num == SYS_REMOVE) {
+
+	}
+	else if (syscall_num == SYS_OPEN) {
+
+	}
+	else if (syscall_num == SYS_CLOSE) {
+
+	}
+	else if (syscall_num == SYS_FILESIZE) {
+
+	}
+	else if (syscall_num == SYS_SEEK) {
+
+	}
+	else if (syscall_num == SYS_TELL) {
+
 	}
 	else {
 		exit(-1);
@@ -65,7 +99,9 @@ int read(int fd, void *buffer, unsigned size)
 	int i = 0;
 	uint8_t temp;
 	if (buffer > PHYS_BASE) //buffer in kernel memory
+	{
 		exit(-1);
+	}
 
 	if (fd == 0) {
 		for (i = 0; i < size; i++) {
@@ -79,26 +115,25 @@ int read(int fd, void *buffer, unsigned size)
 
 int write(int fd, const void *buffer, unsigned size)
 {
-	if (buffer >= PHYS_BASE || (pagedir_get_page(thread_current()->pagedir, buffer) == NULL) || buffer == NULL)
-		exit(-1);
 	if (fd == 1) { // write on the console
 		putbuf((char*)buffer, size);
+		return size;
 	}
-	return size;
+	return -1;
 }
 
-pid_t exec(const char *cmd_line)
+pid_t exec(const char *file)
 {
 	struct thread *current_thread;
 	void *addr;
 
 	current_thread = thread_current();
-	addr = pagedir_get_page(current_thread->pagedir, cmd_line);
+	addr = pagedir_get_page(current_thread->pagedir, file);
 
 	if (addr == NULL)
-		exit(-1); 
+		return -1;
 
-	return process_execute(cmd_line);
+	return process_execute(file);
 }
 
 int wait(pid_t pid) {
@@ -109,11 +144,11 @@ void exit(int status)
 {
 	struct thread *current_thread = thread_current();
 
-	sema_down(&current_thread->parent_status); // 자식 thread에 저장된 부모 thread 상태 업데이트; 자식 thread의 종료
-	sema_up(&(current_thread->parent->wait_flag)); // 부모 thread 대기상태 해제 (프로세스의 부모가 대기하는 경우)
+	sema_down(&current_thread->parent_status); 
+	sema_up(&(current_thread->parent->wait_flag)); 
 
-	current_thread->parent->dead = true; // (프로세스의 부모가 대기하는 경우)
-	current_thread->parent->child_dead = status; // 현재 thread의 상태
+	current_thread->parent->dead = true;
+	current_thread->parent->child_dead = status;
 
 	printf("%s: exit(%d)\n", current_thread->name, status);
 
@@ -141,7 +176,8 @@ int fibonacci(int n)
 	}
 }
 
-int sum_of_4_integers(int n1, int n2, int n3, int n4)
+int sum_of_4_integers(int a, int b, int c, int d)
 {
-	return n1 + n2 + n3 + n4;
+	printf("USERPROG : %d %d %d %d\n",a,b,c,d);
+	return a+b+c+d;
 }
