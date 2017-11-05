@@ -116,6 +116,7 @@ main (void)
 #endif
 
   /* Start thread scheduler and enable interrupts. */
+  
   thread_start ();
   serial_init_queue ();
   timer_calibrate ();
@@ -284,6 +285,7 @@ run_task (char **argv)
   const char *task = argv[1];
   
   printf ("Executing '%s':\n", task);
+
 #ifdef USERPROG
   process_wait (process_execute (task));
 #else

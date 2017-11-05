@@ -175,6 +175,7 @@ thread_create (const char *name, int priority,
 
   ASSERT (function != NULL);
 
+
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
@@ -184,7 +185,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  t->parent_thread = thread_current();
+  t->parent = thread_current();
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
