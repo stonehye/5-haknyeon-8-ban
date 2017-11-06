@@ -109,6 +109,8 @@ struct thread
 
 	struct semaphore wait_flag; // 해당 thread가 대기상태이면 value = 1, 아니면 0
 	struct semaphore parent_status; // 해당 thread의 parent thread가 대기상태이면 value = 0, 아니면 1
+
+	struct file *File[128];
 	////////////////////////
   };
 
