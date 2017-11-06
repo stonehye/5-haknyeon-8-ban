@@ -21,10 +21,18 @@ int fibonacci(int n);
 int sum_of_4_integers(int a, int b, int c, int d);
 bool create(const char* file, unsigned initial_size);
 int open(const char* file);
+void close(int fd);
+int filesize(int fd);
+void seek(int fd, unsigned position);
+bool remove(const char* file);
+unsigned tell(int fd);
+
+struct lock f_lock;
 
 void
 syscall_init (void) 
 {
+	lock_init(&f_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -72,22 +80,22 @@ syscall_handler (struct intr_frame *f UNUSED)
 		f->eax = create((const char*)f_esp[1], (unsigned)f_esp[2]);
 	}
 	else if (syscall_num == SYS_REMOVE) {
-
+		f->eax = remove((const char*)f_esp[1]);
 	}
 	else if (syscall_num == SYS_OPEN) {
-
+		f->eax = open((const char*)f_esp[1]);
 	}
 	else if (syscall_num == SYS_CLOSE) {
-
+		close((int)f_esp[1])
 	}
 	else if (syscall_num == SYS_FILESIZE) {
-
+		f->eax = filesize((int)f_esp[1]);
 	}
 	else if (syscall_num == SYS_SEEK) {
-
+		seek((int)f_esp[1], (unsigned)f_esp[2]);
 	}
 	else if (syscall_num == SYS_TELL) {
-
+		f->eax = tell((int)f_esp[1]);
 	}
 	else {
 		exit(-1);
@@ -103,6 +111,9 @@ int read(int fd, void *buffer, unsigned size)
 {
 	int i = 0;
 	uint8_t temp;
+	struct thread *t;
+	struct list_elem *elem_p;
+
 	if (buffer > PHYS_BASE) //buffer in kernel memory
 	{
 		exit(-1);
@@ -114,15 +125,50 @@ int read(int fd, void *buffer, unsigned size)
 			memcpy(buffer++, &temp, 1);
 		}
 	}
-	else
-		exit(-1);
+	else {
+		int read_size;
+		struct file_jungbo jungbo_temp;
+		t = thread_current();
+		for (elem_p = list_begin(&t->file_list); elem_p != list_end(&t->file_list); elem_p = list_next(elem_p)) {
+			if (list_entry(elem_p, struct file_jungbo, file_elem)->fd == fd) {
+				break;
+			}
+		}
+		if (list_entry(elem_p, struct file_jungbo, file_elem)->fp == NULL)
+			return -1;
+		jungbo_temp = list_entry(elem_p, struct file_jungbo, file_elem);
+		lock_acquire(&f_lock);
+		read_size = file_read(jungbo_temp->fp, buffer, size);
+		lock_release(&f_lock);
+		return read_size;
+	}
 }
 
 int write(int fd, const void *buffer, unsigned size)
 {
+	struct thread *t;
+	struct list_elem *elem_p;
+
 	if (fd == 1) { // write on the console
 		putbuf((char*)buffer, size);
 		return size;
+	}
+	else {
+		int write_size;
+		struct file_jungbo jungbo_temp;
+		t = thread_current();
+		for (elem_p = list_begin(&t->file_list); elem_p != list_end(&t->file_list); elem_p = list_next(elem_p)) {
+			if (list_entry(elem_p, struct file_jungbo, file_elem)->fd == fd) {
+				break;
+			}
+		}
+		if (list_entry(elem_p, struct file_jungbo, file_elem)->fp == NULL)
+			return -1;
+		jungbo_temp = list_entry(elem_p, struct file_jungbo, file_elem);
+		lock_acquire(&f_lock);
+		write_size = file_write(jungbo_temp->fp, buffer, size);
+		lock_release(&f_lock);
+		return write_size;
 	}
 	return -1;
 }
@@ -162,7 +208,7 @@ void exit(int status)
 
 bool create(const char* file, unsigned initial_size)
 {
-	if (!fild || initial_size < 0)
+	if (!file || initial_size < 0)
 		exit(-1);
 
 	return filesys_create(file, initial_size);
@@ -199,29 +245,117 @@ int open(const char* file)
 {
 	struct thread *t = thread_current();
 	struct file *f;
+	struct file_jungbo f_info, f_prev;
 	int i;
 
 	if (!file) {
-		// pass (lock_release) lock_release(&_lock);
 		exit(-1);
 	}
 
+	lock_acquire(&f_lock);
 	f = filesys_open(file);
-	if (f) {
-		for (i = 3; i < 128; i++) {
-			if (t->FILE[i] == NULL) {
-				t->FILE[i] = f;
-				break;
-			}
-		}
-		if (strcmp(file, t->name) == 0) // file_allow_write ()가 호출되거나 FILE이 닫힐 때까지 FILE의 내부 inode에 대한 쓰기 작업을 금지합니다.
-			file_deny_write(f);
+	lock_release(f_lock);
 
-		// pass (lock_release) lock_release(&_lock);
-		return i;
+	if (f) {
+		f_info = malloc(sizeof(*f_info));
+		f_info->fp = f;
+
+		if (list_empty(&t->file_list))
+			f_info->fd = 2;
+		else {
+			f_prev = list_entry(list_back(&t->file_list), struct file_jungbo, file_elem);
+			f_info->fd = f_prev->fd + 1;
+		}
+		list_push_back(&t->file_list, &f_info->file_elem);
+
+		return f_info->fd;
 	}
+	
+	return -1;
+}
+
+void close(int fd)
+{
+	struct thread *t = thread_current();
+	struct list_elem *temp;
+
+	if (fd == 0 || fd == 1 || fd == 2)
+		return;
+
+	for (temp = list_begin(&(t->flie_list)); temp != list_end(&(t->file_list)); temp = list_next(temp)) {
+		if (list_entry(temp, struct file_jungbo, file_elem)->fd == fd)
+			break;
+	}
+
+	if (temp == list_end(&(t->file_list)))
+		return;
 	else {
-		// pass (lock_release) lock_release(&_lock);
-		return -1;
+		//lock_acquire(&f_lock);
+		file_close(list_entry(temp, struct file_jungbo, fild_elem)->fp);
+		//lock_release(&f_lock);
+		list_remove(temp);
+		free(list_entry(temp, struct file_jungbo, file_elem));
 	}
+}
+
+int filesize(int fd)
+{
+	struct thread *t = thread_current();
+	struct list_elem *temp;
+
+	for (temp = list_begin(&(t->flie_list)); temp != list_end(&(t->file_list)); temp = list_next(temp)) {
+		if (list_entry(temp, struct file_jungbo, file_elem)->fd == fd)
+			break;
+	}
+
+	if (temp == list_end(&(t->file_list)))
+		return -1;
+	else
+		return file_length(list_entry(temp, struct file_list, file_elem)->fp);
+}
+
+void seek(int fd, unsigned position)
+{
+	struct thread *t = thread_current();
+	struct list_elem *temp;
+
+	for (temp = list_begin(&(t->flie_list)); temp != list_end(&(t->file_list)); temp = list_next(temp)) {
+		if (list_entry(temp, struct file_jungbo, file_elem)->fd == fd)
+			break;
+	}
+
+	if (temp == list_end(&(t->file_list)))
+		return;
+	else
+		file_seek(list_entry(temp, struct file_list, file_elem)->fp, position);
+}
+
+bool remove(const char* file)
+{
+	if (file[0] == '\0')
+		return false;
+	if (!file)
+		exit(-1);
+	return filesys_remove(file);
+}
+
+unsigned tell(int fd)
+{
+	struct thread *t;
+	struct list_elem *elem_p;
+	struct file_jungbo jungbo_temp;
+	unsigned tell_temp;
+	t = current_thread();
+	for (elem_p = list_begin(&t->file_list); elem_p != list_end(&t->file_list); elem_p = list_next(elem_p)) {
+		if (list_entry(elem_p, struct file_jungbo, file_elem)->fd == fd) {
+			break;
+		}
+	}
+	if (list_entry(elem_p, struct file_jungbo, file_elem)->fp == NULL)
+		return -1;
+	jungbo_temp = list_entry(elem_p, struct file_jungbo, file_elem);
+	lock_acquire(&f_lock);
+	tell_temp = file_tell(jungbo_temp->fp);
+	lock_release(&f_lock);
+	return tell_temp;
 }
