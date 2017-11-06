@@ -19,6 +19,9 @@ int wait(pid_t pid);
 void exit(int status);
 int fibonacci(int n);
 int sum_of_4_integers(int a, int b, int c, int d);
+bool create(const char* file, unsigned initial_size);
+int open(const char* file);
+
 void
 syscall_init (void) 
 {
@@ -43,6 +46,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}
 	else if (syscall_num == SYS_EXIT) {
 		f->eax = *(int*)(f->esp+4);
+
+
 		exit((int)f_esp[1]);
 	}
 	else if (syscall_num == SYS_EXEC) {
@@ -64,7 +69,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		f->eax = fibonacci((int)f_esp[1]);
 	}
 	else if (syscall_num == SYS_CREATE) {
-
+		f->eax = create((const char*)f_esp[1], (unsigned)f_esp[2]);
 	}
 	else if (syscall_num == SYS_REMOVE) {
 
@@ -155,6 +160,14 @@ void exit(int status)
 	thread_exit();
 }
 
+bool create(const char* file, unsigned initial_size)
+{
+	if (!fild || initial_size < 0)
+		exit(-1);
+
+	return filesys_create(file, initial_size);
+}
+
 int fibonacci(int n)
 {
 	int i;
@@ -180,4 +193,35 @@ int sum_of_4_integers(int a, int b, int c, int d)
 {
 	printf("USERPROG : %d %d %d %d\n",a,b,c,d);
 	return a+b+c+d;
+}
+
+int open(const char* file)
+{
+	struct thread *t = thread_current();
+	struct file *f;
+	int i;
+
+	if (!file) {
+		// pass (lock_release) lock_release(&_lock);
+		exit(-1);
+	}
+
+	f = filesys_open(file);
+	if (f) {
+		for (i = 3; i < 128; i++) {
+			if (t->FILE[i] == NULL) {
+				t->FILE[i] = f;
+				break;
+			}
+		}
+		if (strcmp(file, t->name) == 0) // file_allow_write ()가 호출되거나 FILE이 닫힐 때까지 FILE의 내부 inode에 대한 쓰기 작업을 금지합니다.
+			file_deny_write(f);
+
+		// pass (lock_release) lock_release(&_lock);
+		return i;
+	}
+	else {
+		// pass (lock_release) lock_release(&_lock);
+		return -1;
+	}
 }
